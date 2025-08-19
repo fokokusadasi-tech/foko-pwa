@@ -6,12 +6,12 @@ const $=(s)=>document.querySelector(s);
 const grid=$("#grid"), editor=$("#editor"), imagesEl=$("#images");
 const modal=$("#modalBackdrop"), aboutModal=$("#aboutBackdrop"), modalTitle=$("#modalTitle");
 const imgInput=$("#imgInput"), versionText=$("#versionText");
-const profileSelect=$("#profileSelect"), newProfileBtn=$("#newProfileBtn");
+const profileSelect=$("#profileSelect"), musteriEkleBtn=$("#musteriEkleBtn"), musteriSilBtn=$("#musteriSilBtn");
 const importBtn=$("#importBtn"), importInput=$("#importInput"), exportBtn=$("#exportBtn");
 
 function getQueryParam(key){ const u=new URL(location.href); return u.searchParams.get(key); }
 
-// ---- Profiles in localStorage ----
+// ---- Profiles (Müşteriler) in localStorage ----
 const LS_PROFILES_KEY = "foko-profiles";
 const LS_ACTIVE_KEY = "foko-active-profile";
 
@@ -25,20 +25,24 @@ function setState(name, state){ const p=allProfiles(); p[name]=state; saveAllPro
 function ensureProfileExists(name){ const p=allProfiles(); if(!p[name]){ p[name]=defaultState(); saveAllProfiles(p); }}
 
 function refreshProfileUI(){
-  // fill select
   const p=allProfiles(); const names=Object.keys(p); if(names.indexOf("Varsayılan")===-1) names.unshift("Varsayılan");
   profileSelect.innerHTML="";
   names.forEach(n=>{ const opt=document.createElement("option"); opt.value=n; opt.textContent=n; profileSelect.appendChild(opt); });
   profileSelect.value = activeProfileName();
 }
-
 function switchProfile(name){ ensureProfileExists(name); setActiveProfileName(name); state = getState(name); render(); }
 
-newProfileBtn.addEventListener("click", ()=>{
-  const n = prompt("Yeni profil adı:", "Müşteri-1"); if(!n) return;
+musteriEkleBtn.addEventListener("click", ()=>{
+  const n = prompt("Yeni müşteri adı:", "Müşteri-1"); if(!n) return;
   ensureProfileExists(n); setActiveProfileName(n); refreshProfileUI(); state=getState(n); render();
 });
-
+musteriSilBtn.addEventListener("click", ()=>{
+  const cur = activeProfileName();
+  if(cur==="Varsayılan"){ alert("'Varsayılan' silinemez."); return; }
+  if(!confirm(`'${cur}' müşterisini silmek istiyor musunuz? Bu cihazdaki veriler silinir.`)) return;
+  const p=allProfiles(); delete p[cur]; saveAllProfiles(p);
+  setActiveProfileName("Varsayılan"); ensureProfileExists("Varsayılan"); state=getState("Varsayılan"); refreshProfileUI(); render();
+});
 profileSelect.addEventListener("change", ()=>switchProfile(profileSelect.value));
 
 // Export / Import
@@ -187,6 +191,7 @@ $("#pngBtn").addEventListener("click", async ()=>{
   a.href=canvas.toDataURL("image/png"); a.click();
 });
 
+// ----- Section & Button add/rename/edit -----
 $("#addSectionBtn").addEventListener("click", ()=>{
   const name = prompt("Yeni başlık adı:"); if(!name) return;
   const colPick = prompt("Hangi sütun? 1 / 2 / 3", "1")||"1";
@@ -227,15 +232,48 @@ $("#addButtonBtn").addEventListener("click", ()=>{
   btns.push(name); save(); render(); alert("Buton eklendi.");
 });
 
+$("#editButtonBtn").addEventListener("click", ()=>{
+  // 1) pick section
+  const secList=[]; const secPos=[];
+  ["LEFT","MIDDLE","RIGHT"].forEach(col=>{
+    state.sections[col].forEach(([t,btns],i)=>{ secList.push(`${col} — ${t}`); secPos.push([col,i]); });
+  });
+  if(!secList.length){ alert("Düzenlenecek bölüm yok."); return; }
+  const secPick = prompt("Bölüm seçin:\n" + secList.map((x,i)=>`${i+1}) ${x}`).join("\n"), "1"); if(!secPick) return;
+  let sidx=parseInt(secPick,10)-1; if(isNaN(sidx)||sidx<0||sidx>=secList.length) return;
+  const [scol, si] = secPos[sidx];
+  const btns = state.sections[scol][si][1];
+  if(!btns.length){ alert("Bu bölümde buton yok."); return; }
+  // 2) pick button
+  const btnPick = prompt("Buton seçin:\n" + btns.map((x,i)=>`${i+1}) ${x}`).join("\n"), "1"); if(!btnPick) return;
+  let bidx=parseInt(btnPick,10)-1; if(isNaN(bidx)||bidx<0||bidx>=btns.length) return;
+  const cur = btns[bidx];
+  // 3) action: R=rename, S=delete
+  const act = prompt(`Ne yapmak istersiniz?
+R) Yeniden adlandır
+S) Sil
+(Seçim: R/S)`, "R");
+  if(!act) return;
+  if(act.toUpperCase()==="R"){
+    const nn = prompt("Yeni buton adı:", cur); if(!nn) return;
+    if(btns.some(b=>b.trim().toLowerCase()===nn.trim().toLowerCase()) && nn.trim().toLowerCase()!==cur.trim().toLowerCase()){
+      alert("Aynı isimde başka buton var."); return;
+    }
+    btns[bidx]=nn; save(); render(); alert("Buton adı güncellendi.");
+  }else if(act.toUpperCase()==="S"){
+    if(!confirm(`'${cur}' butonunu silmek istiyor musunuz?`)) return;
+    btns.splice(bidx,1); save(); render(); alert("Buton silindi.");
+  }
+});
+
+// ----- Title / About / Update / Contact -----
 $("#editTitleBtn").addEventListener("click", ()=>{
   const nv = prompt("Başlıktaki 'Kuşadası' yerine ne yazsın?", state.city||"KUŞADASI");
   if(!nv) return; state.city = nv.trim().toUpperCase(); save(); render();
 });
-
 $("#aboutLink").addEventListener("click", ()=>{ versionText.textContent = APP_VERSION; aboutModal.style.display = "flex"; });
 $("#aboutCloseBtn").addEventListener("click", ()=>aboutModal.style.display="none");
 $("#checkUpdateLink").addEventListener("click", ()=>{ window.open(UPDATE_DOWNLOAD_URL, "_blank"); });
-
 $("#contactBtn").addEventListener("click", ()=>{
   const choice = prompt("İletişim: 1) WhatsApp 2) Instagram 3) Mail", "1");
   if(choice==="1"){ window.open("https://wa.me/908503041580","_blank"); }
