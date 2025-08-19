@@ -1,18 +1,72 @@
-const APP_VERSION = "1.0.0";
-const UPDATE_DOWNLOAD_URL = "https://example.com/foko-latest.zip";
-const LATEST_JSON_URL = "https://example.com/latest.json";
+const APP_VERSION="1.0.0";
+const UPDATE_DOWNLOAD_URL="https://example.com/foko-latest.zip";
+const LATEST_JSON_URL="https://example.com/latest.json";
 
-const $ = (sel)=>document.querySelector(sel);
-const grid = $("#grid");
-const editor = $("#editor");
-const imagesEl = $("#images");
-const modal = $("#modalBackdrop");
-const aboutModal = $("#aboutBackdrop");
-const modalTitle = $("#modalTitle");
-const imgInput = $("#imgInput");
-const versionText = $("#versionText");
+const $=(s)=>document.querySelector(s);
+const grid=$("#grid"), editor=$("#editor"), imagesEl=$("#images");
+const modal=$("#modalBackdrop"), aboutModal=$("#aboutBackdrop"), modalTitle=$("#modalTitle");
+const imgInput=$("#imgInput"), versionText=$("#versionText");
+const profileSelect=$("#profileSelect"), newProfileBtn=$("#newProfileBtn");
+const importBtn=$("#importBtn"), importInput=$("#importInput"), exportBtn=$("#exportBtn");
 
-let state = JSON.parse(localStorage.getItem("foko-state")||"null") || defaultState();
+function getQueryParam(key){ const u=new URL(location.href); return u.searchParams.get(key); }
+
+// ---- Profiles in localStorage ----
+const LS_PROFILES_KEY = "foko-profiles";
+const LS_ACTIVE_KEY = "foko-active-profile";
+
+function allProfiles(){ try{ return JSON.parse(localStorage.getItem(LS_PROFILES_KEY)||"{}"); }catch{ return {}; } }
+function saveAllProfiles(obj){ localStorage.setItem(LS_PROFILES_KEY, JSON.stringify(obj)); }
+function activeProfileName(){ return localStorage.getItem(LS_ACTIVE_KEY) || getQueryParam("p") || "Varsayılan"; }
+function setActiveProfileName(n){ localStorage.setItem(LS_ACTIVE_KEY, n); }
+function getState(name){ const p=allProfiles(); return p[name] || defaultState(); }
+function setState(name, state){ const p=allProfiles(); p[name]=state; saveAllProfiles(p); }
+
+function ensureProfileExists(name){ const p=allProfiles(); if(!p[name]){ p[name]=defaultState(); saveAllProfiles(p); }}
+
+function refreshProfileUI(){
+  // fill select
+  const p=allProfiles(); const names=Object.keys(p); if(names.indexOf("Varsayılan")===-1) names.unshift("Varsayılan");
+  profileSelect.innerHTML="";
+  names.forEach(n=>{ const opt=document.createElement("option"); opt.value=n; opt.textContent=n; profileSelect.appendChild(opt); });
+  profileSelect.value = activeProfileName();
+}
+
+function switchProfile(name){ ensureProfileExists(name); setActiveProfileName(name); state = getState(name); render(); }
+
+newProfileBtn.addEventListener("click", ()=>{
+  const n = prompt("Yeni profil adı:", "Müşteri-1"); if(!n) return;
+  ensureProfileExists(n); setActiveProfileName(n); refreshProfileUI(); state=getState(n); render();
+});
+
+profileSelect.addEventListener("change", ()=>switchProfile(profileSelect.value));
+
+// Export / Import
+exportBtn.addEventListener("click", ()=>{
+  const data = allProfiles();
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+  const a=document.createElement("a"); a.download="foko-yedek.json"; a.href=URL.createObjectURL(blob); a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+});
+importBtn.addEventListener("click", ()=>importInput.click());
+importInput.addEventListener("change", (e)=>{
+  const file = e.target.files && e.target.files[0]; if(!file) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    try{
+      const parsed = JSON.parse(fr.result);
+      if(typeof parsed==="object" && !Array.isArray(parsed)){
+        saveAllProfiles(parsed); refreshProfileUI(); switchProfile(activeProfileName());
+        alert("Yedek içe aktarıldı.");
+      }else{ alert("Geçersiz yedek dosyası."); }
+    }catch{ alert("Geçersiz yedek dosyası."); }
+  };
+  fr.readAsText(file);
+  e.target.value="";
+});
+
+// ----- App state -----
+let state = getState(activeProfileName());
 let currentKey = null;
 
 function defaultState(){
@@ -49,10 +103,12 @@ function defaultState(){
     content: {}
   };
 }
-function save(){ localStorage.setItem("foko-state", JSON.stringify(state)); }
+
+function save(){ setState(activeProfileName(), state); }
 
 function render(){
   $("#city").textContent = state.city || "KUŞADASI";
+  refreshProfileUI();
   grid.innerHTML = "";
   ["LEFT","MIDDLE","RIGHT"].forEach(colKey=>{
     const col = document.createElement("div");
@@ -94,7 +150,7 @@ $("#saveBtn").addEventListener("click", ()=>{
   const html = editor.innerHTML;
   const imgs = Array.from(imagesEl.querySelectorAll("img")).map(i=>i.src);
   state.content[currentKey] = { html, images: imgs };
-  save(); alert("Kaydedildi ve varsayılan görünüm METİN olarak ayarlandı.");
+  save(); alert("Kaydedildi.");
 });
 $("#closeBtn").addEventListener("click", closeEditor);
 $("#imgInput").addEventListener("change", (e)=>{
@@ -139,7 +195,6 @@ $("#addSectionBtn").addEventListener("click", ()=>{
   state.sections[col].push([name, []]); save(); render(); alert(`${colPick}. sütuna '${name}' eklendi.`);
 });
 
-// Single, correct rename handler
 $("#renameSectionBtn").addEventListener("click", ()=>{
   const all=[]; const pos=[];
   ["LEFT","MIDDLE","RIGHT"].forEach(col=>{
@@ -191,28 +246,16 @@ $("#contactBtn").addEventListener("click", ()=>{
 modal.addEventListener("click", (e)=>{ if(e.target===modal) closeEditor(); });
 aboutModal.addEventListener("click", (e)=>{ if(e.target===aboutModal) aboutModal.style.display="none"; });
 
-function registerSW(){
-  if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("./sw.js");
-  }
-}
+function registerSW(){ if("serviceWorker" in navigator){ navigator.serviceWorker.register("./sw.js"); } }
 async function maybeCheckUpdate(){
-  try{
-    const r = await fetch(LATEST_JSON_URL, {cache: "no-store"});
-    const data = await r.json();
-    const latest = (data.latest_version||"").trim();
-    const dl = data.download_url || UPDATE_DOWNLOAD_URL;
-    if(latest && compareVersion(latest, APP_VERSION) > 0){
-      if(confirm(`Yeni sürüm mevcut: ${latest}\nİndirmek ister misiniz?`)){
-        window.open(dl, "_blank");
-      }
-    }
+  try{ const r=await fetch(LATEST_JSON_URL,{cache:"no-store"}); const data=await r.json();
+    const latest=(data.latest_version||"").trim(); const dl=data.download_url||UPDATE_DOWNLOAD_URL;
+    if(latest && compareVersion(latest, APP_VERSION)>0){ if(confirm(`Yeni sürüm mevcut: ${latest}\nİndirmek ister misiniz?`)){ window.open(dl,"_blank"); } }
   }catch{}
 }
-function compareVersion(a,b){
-  const pa=a.split(".").map(x=>parseInt(x,10)||0);
-  const pb=b.split(".").map(x=>parseInt(x,10)||0);
-  for(let i=0;i<3;i++){ if((pa[i]||0)!==(pb[i]||0)) return (pa[i]||0)>(pb[i]||0)?1:-1; }
-  return 0;
+function compareVersion(a,b){ const pa=a.split(".").map(x=>parseInt(x,10)||0), pb=b.split(".").map(x=>parseInt(x,10)||0);
+  for(let i=0;i<3;i++){ if((pa[i]||0)!==(pb[i]||0)) return (pa[i]||0)>(pb[i]||0)?1:-1; } return 0;
 }
-render(); registerSW(); setTimeout(maybeCheckUpdate, 400);
+
+refreshProfileUI(); switchProfile(activeProfileName()); // sets state & renders
+registerSW(); setTimeout(maybeCheckUpdate, 400);
