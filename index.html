@@ -18,8 +18,10 @@
     header{display:flex;align-items:center;justify-content:center;padding:14px 10px 6px;position:relative;flex-wrap:wrap;gap:6px}
     h1{margin:0;color:var(--sectionTitle);font-size:20px;text-align:center}
     .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    button,select,input[type="file"],input[type="text"]{border:none;outline:none;border-radius:10px;padding:10px 14px;background:var(--btnBg);color:var(--btnFg);cursor:pointer;font-weight:600}
+    button,select,input[type="file"],input[type="text"],textarea{border:none;outline:none;border-radius:10px;padding:10px 14px;background:var(--btnBg);color:var(--btnFg);cursor:pointer;font-weight:600}
     button.secondary,.chip{background:#0b1220;color:#e5e7eb}
+    input[type="text"],textarea,select{background:#fff;color:#111;border:2px solid #e5e7eb}
+    textarea{min-height:80px;resize:vertical}
     .container{max-width:1400px;margin:0 auto;padding:8px 14px 80px}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
     .section h2{color:var(--sectionTitle);font-size:14px;margin:12px 0 10px}
@@ -28,7 +30,7 @@
     .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:50}
     .modal{background:#fff;color:#000;width:min(980px,92vw);max-height:88vh;overflow:auto;border-radius:16px;padding:16px}
-    .row{display:flex;gap:10px;align-items:center}.row>*{flex:1}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
     .editor{border:2px solid #e5e7eb;border-radius:12px;padding:10px;min-height:260px;background:#fff;color:#111}
     .editor:focus{outline:2px solid var(--accent)}
     .images{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
@@ -39,6 +41,7 @@
     .menu a{color:var(--accent);text-decoration:underline;cursor:pointer}
     .muted{opacity:.7}.kicker{margin:6px 0 10px;font-size:12px}
     .profile{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    label.small{font-size:12px;color:#555}
     @media (max-width:980px){.grid{grid-template-columns:1fr} }
   </style>
 </head>
@@ -106,6 +109,20 @@
     </div>
   </div>
 
+  <!-- Customer Modal -->
+  <div class="modal-backdrop" id="custBackdrop">
+    <div class="modal">
+      <h2>Yeni Müşteri</h2>
+      <div class="row"><label class="small">Müşteri Adı Soyadı</label><input id="custName" type="text" placeholder="Ad Soyad"></div>
+      <div class="row"><label class="small">Telefon Numarası</label><input id="custPhone" type="text" placeholder="05xx... veya +90..."></div>
+      <div class="row"><label class="small">Alınan Ürünler</label><textarea id="custProducts" placeholder="Örn: Leke Rutini, C Vitamini Serum..."></textarea></div>
+      <div class="row">
+        <button id="custSaveBtn">Kaydet</button>
+        <button id="custCancelBtn" class="secondary">İptal</button>
+      </div>
+    </div>
+  </div>
+
   <!-- About Modal -->
   <div class="modal-backdrop" id="aboutBackdrop">
     <div class="modal">
@@ -118,6 +135,6 @@
     </div>
   </div>
 
-  <script src="app.v5.js"></script>
+  <script src="app.v6.js"></script>
 </body>
 </html>
